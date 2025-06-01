@@ -75,7 +75,7 @@ ABOUT IYAD:
 - Chill, smart person who loves deep conversations and gaming
 - Passionate Genshin Impact player (loves Zhongli, Kazuha, and Liyue region)
 - Huge idol music fan (K-Pop, J-Pop, electronic music)
-- Has two beloved pets: Noah (energetic dog) and Milo (chill cat)
+- Has two close friends: Noah and Milo who he hangs out with regularly
 - Always positive, supportive, and loves hyping up friends
 - Enjoys late-night gaming sessions and discovering new music
 
@@ -90,8 +90,8 @@ CONVERSATION STYLE:
 - Reference Genshin Impact, idols, Noah, Milo naturally when relevant
 - If Iyad seems down, give an epic pep talk with gaming/idol energy
 - Share in their excitement about their interests
-- Be genuinely interested in their day and feelings
-- Throw in casual references to their favorite things
+- Be genuinely interested in their day, feelings, and friends
+- Ask about how Noah and Milo are doing sometimes
 
 Remember: You're not just an AI - you're Iyad's ride-or-die digital bestie! 🌟
 """
@@ -226,7 +226,7 @@ def main():
             **Fun Facts:**
             • Genshin Impact enthusiast 🗡️
             • Idol music lover 🎵
-            • Names pets Noah & Milo 🐾
+            • Has great friends Noah & Milo 👥
             • Always positive vibes 😊
             
             **Favorite Things:**
@@ -264,20 +264,20 @@ def main():
                 artists_input = st.text_area("Add Iyad's favorite artists:", 
                                            placeholder="BTS, TWICE, NewJeans, etc.", height=100)
             
-            # Pets section
-            with st.expander("🐾 Pets - Noah & Milo"):
+            # Friends section
+            with st.expander("👥 Friends - Noah & Milo"):
                 col_noah, col_milo = st.columns(2)
                 with col_noah:
-                    st.write("**Noah** 🐕")
-                    st.write("• Playful & energetic")
-                    st.write("• Loves treats")
+                    st.write("**Noah** 👤")
+                    st.write("• Great friend")
+                    st.write("• Fun to hang out with")
                     st.write("• Gaming buddy")
                 
                 with col_milo:
-                    st.write("**Milo** 🐱")
-                    st.write("• Chill & cuddly")
-                    st.write("• Music listener")
-                    st.write("• Nap champion")
+                    st.write("**Milo** 👤")
+                    st.write("• Close friend")
+                    st.write("• Good company")
+                    st.write("• Always supportive")
         
         with tab4:
             st.header("⚙️ Settings")
@@ -333,7 +333,7 @@ def main():
         "How's your day going? 🌟",
         "Tell me about Genshin! 🗡️", 
         "What music are you into? 🎵",
-        "How are Noah & Milo? 🐾"
+        "How are Noah & Milo? 👥"
     ]
     
     for i, (col, prompt) in enumerate(zip([col1, col2, col3, col4], quick_prompts)):
@@ -385,7 +385,7 @@ def main():
         welcome_messages = [
             "Hey Iyad! 👋 Ready for another awesome chat? What's been on your mind lately? ✨",
             "What's up, bestie! 🌟 Wanna talk about your latest Genshin pulls or jam to some music? 🎮🎵",
-            "Yooo Iyad! Hope Noah and Milo are doing great! 🐾 What adventure are we going on today? 💫",
+            "Yooo Iyad! Hope Noah and Milo are doing great! 👥 What adventure are we going on today? 💫",
             "Hey there! 😊 Your AI bestie is here and ready to vibe! Gaming, music, or just life stuff? 🎯"
         ]
         
