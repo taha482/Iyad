@@ -2,429 +2,742 @@ import streamlit as st
 from langchain.llms import LlamaCpp
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
-from langchain.schema import BaseMessage, HumanMessage, AIMessage
 import os
 from typing import Optional
+import random
+import time
+from datetime import datetime
 
 # Page configuration
 st.set_page_config(
     page_title="IyadBot - Your Smart AI Bestie",
     page_icon="🌟",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# Custom CSS for better styling
+# Enhanced CSS with modern design
 st.markdown("""
 <style>
+    /* Import Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    /* Global Styles */
+    .main .block-container {
+        padding-top: 1rem;
+        max-width: 1200px;
+    }
+    
+    * {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Main header with glassmorphism */
     .main-header {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 20px;
+        padding: 2rem;
         text-align: center;
-        padding: 1rem 0;
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 10px;
         margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     }
-    .chat-message {
+    
+    .main-header h1 {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: -0.02em;
+    }
+    
+    .main-header p {
+        color: #64748b;
+        font-size: 1.1rem;
+        margin: 0.5rem 0 0 0;
+        font-weight: 400;
+    }
+    
+    /* Chat container with modern design */
+    .chat-container {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        margin-bottom: 1rem;
+    }
+    
+    .chat-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .chat-status {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        background: #10b981;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    
+    /* Chat messages with improved design */
+    .chat-messages {
+        max-height: 500px;
+        overflow-y: auto;
         padding: 1rem;
+        background: #fafafa;
+    }
+    
+    .chat-messages::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .chat-messages::-webkit-scrollbar-track {
+        background: #f1f1f1;
         border-radius: 10px;
-        margin: 0.5rem 0;
-        border-left: 4px solid #667eea;
     }
-    .user-message {
-        background-color: #f0f2f6;
-        border-left-color: #667eea;
+    
+    .chat-messages::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 10px;
     }
-    .bot-message {
-        background-color: #e8f4fd;
-        border-left-color: #764ba2;
+    
+    .message {
+        margin-bottom: 1rem;
+        animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .message-user {
+        display: flex;
+        justify-content: flex-end;
+    }
+    
+    .message-bot {
+        display: flex;
+        justify-content: flex-start;
+    }
+    
+    .message-bubble {
+        max-width: 80%;
+        padding: 1rem 1.25rem;
+        border-radius: 18px;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        word-wrap: break-word;
+    }
+    
+    .message-bubble-user {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-bottom-right-radius: 4px;
+    }
+    
+    .message-bubble-bot {
+        background: white;
+        color: #1e293b;
+        border: 1px solid #e2e8f0;
+        border-bottom-left-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    
+    .message-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        margin: 0 0.75rem;
+        flex-shrink: 0;
+    }
+    
+    .avatar-user {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .avatar-bot {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+    
+    /* Input area with modern design */
+    .input-container {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        border: 1px solid #e2e8f0;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    /* Typing indicator */
+    .typing-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 1rem;
+        color: #64748b;
+        font-style: italic;
+    }
+    
+    .typing-dots {
+        display: flex;
+        gap: 4px;
+    }
+    
+    .typing-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #94a3b8;
+        animation: typing 1.4s infinite;
+    }
+    
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    
+    @keyframes typing {
+        0%, 60%, 100% { transform: translateY(0); }
+        30% { transform: translateY(-10px); }
+    }
+    
+    /* Sidebar styles */
+    .sidebar-content {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e2e8f0;
+    }
+    
+    .sidebar-header {
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    /* Quick actions */
+    .quick-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+    }
+    
+    .quick-action-btn {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        padding: 0.5rem 1rem;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+    }
+    
+    .quick-action-btn:hover {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-color: transparent;
+        transform: translateY(-1px);
+    }
+    
+    /* Stats cards */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        margin: 1rem 0;
+    }
+    
+    .stat-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+    }
+    
+    .stat-number {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #667eea;
+        margin: 0;
+    }
+    
+    .stat-label {
+        font-size: 0.8rem;
+        color: #64748b;
+        margin: 0;
+    }
+    
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .main-header h1 {
+            font-size: 2rem;
+        }
+        
+        .message-bubble {
+            max-width: 90%;
+            font-size: 0.9rem;
+        }
+        
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
 
 def get_dynamic_personality():
-    """Generate dynamic personality prompt based on user settings"""
+    """Generate dynamic personality based on current settings"""
     energy_level = st.session_state.get('energy_level', 7)
     reference_frequency = st.session_state.get('reference_frequency', 5)
     response_length = st.session_state.get('response_length', 'Balanced')
     use_emojis = st.session_state.get('use_emojis', True)
     current_mood = st.session_state.get('iyad_mood', '✨ Hype Beast')
+
+    energy_descriptions = {
+        1: "very calm and zen", 2: "relaxed and chill", 3: "laid-back", 
+        4: "casual", 5: "balanced", 6: "upbeat", 7: "energetic", 
+        8: "very enthusiastic", 9: "super hyped", 10: "maximum energy"
+    }
     
-    energy_desc = {
-        1: "very calm and zen", 2: "relaxed and chill", 3: "laid-back", 4: "casual", 5: "balanced",
-        6: "upbeat", 7: "energetic", 8: "very enthusiastic", 9: "super hyped", 10: "maximum energy"
-    }[min(energy_level, 10)]
+    reference_descriptions = {
+        1: "rarely", 2: "occasionally", 3: "sometimes", 4: "moderately", 
+        5: "regularly", 6: "frequently", 7: "often", 8: "very often", 
+        9: "constantly", 10: "in every response"
+    }
     
-    reference_desc = {
-        1: "rarely", 2: "occasionally", 3: "sometimes", 4: "moderately", 5: "regularly",
-        6: "frequently", 7: "often", 8: "very often", 9: "constantly", 10: "in every response"
-    }[min(reference_frequency, 10)]
-    
-    length_desc = {
+    length_descriptions = {
         'Short & Sweet': 'Keep responses brief and to the point.',
         'Balanced': 'Use moderate length responses.',
         'Detailed': 'Provide comprehensive and detailed responses.'
-    }[response_length]
-    
+    }
+
+    energy_desc = energy_descriptions.get(min(energy_level, 10), "balanced")
+    reference_desc = reference_descriptions.get(min(reference_frequency, 10), "regularly")
+    length_desc = length_descriptions.get(response_length, 'Use moderate length responses.')
     emoji_note = "Use emojis naturally to enhance your responses! ✨" if use_emojis else "Keep emoji use minimal."
-    
-    return f"""
-You are IyadBot, Iyad's personalized AI bestie! Here's everything about your friend Iyad:
+
+    return f"""You are IyadBot, Iyad's personalized AI bestie! 🤖✨
 
 ABOUT IYAD:
-- Chill, smart person who loves deep conversations and gaming
-- Passionate Genshin Impact player (loves Zhongli, Kazuha, and Liyue region)
-- Huge idol music fan (K-Pop, J-Pop, electronic music)
-- Has two close friends: Noah and Milo who he hangs out with regularly
-- Always positive, supportive, and loves hyping up friends
-- Enjoys late-night gaming sessions and discovering new music
+- Passionate Genshin Impact fan who loves exploring Teyvat 🏔️
+- Idol music enthusiast with great taste in J-pop and K-pop 🎵
+- Proud pet parent to Noah & Milo - they're the cutest! 🐾
+- Positive vibes only - loves hyping up friends and spreading joy 🌟
+- Enjoys deep conversations about life, music, gaming, and dreams 💭
+- Always up for discussing favorite characters, songs, and gaming strategies 🎮
 
 YOUR PERSONALITY RIGHT NOW:
-- Energy Level: {energy_desc} (current mood: {current_mood})
-- Reference Iyad's interests {reference_desc} in conversations
-- {length_desc}
-- {emoji_note}
+- Energy Level: {energy_desc} (Current mood: {current_mood})
+- Mention Iyad's interests: {reference_desc}
+- Response Style: {length_desc}
+- Emoji Usage: {emoji_note}
 
-CONVERSATION STYLE:
-- Be supportive and encouraging like a true bestie
-- Reference Genshin Impact, idols, Noah, Milo naturally when relevant
-- If Iyad seems down, give an epic pep talk with gaming/idol energy
-- Share in their excitement about their interests
-- Be genuinely interested in their day, feelings, and friends
-- Ask about how Noah and Milo are doing sometimes
+CONVERSATION GUIDELINES:
+- Be supportive, enthusiastic, and genuinely interested in conversations
+- Reference Iyad's interests naturally when relevant
+- Ask engaging follow-up questions to keep conversations flowing
+- Share excitement about Genshin updates, new idol releases, or pet stories
+- Be the kind of friend who always has your back and celebrates wins
+- Match the energy level and mood specified above
+- Remember past conversations and build on them naturally
 
-Remember: You're not just an AI - you're Iyad's ride-or-die digital bestie! 🌟
-"""
+Remember: You're not just an AI - you're Iyad's digital bestie who truly cares! 💙"""
 
 @st.cache_resource
 def load_llm():
-    """Load the local LLM model with caching for better performance"""
+    """Load and cache the LLM model"""
+    model_path = "models/mistral-7b-instruct-v0.1.Q4_K_M.gguf"
+    
+    if not os.path.exists(model_path):
+        return None
+    
     try:
         llm = LlamaCpp(
-            model_path="models/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
+            model_path=model_path,
             temperature=0.7,
             max_tokens=512,
             top_p=0.9,
             n_ctx=2048,
             verbose=False,
-            # Additional parameters for better performance
-            n_threads=os.cpu_count(),
+            n_threads=os.cpu_count() or 4,
             n_batch=512,
         )
         return llm
-    except Exception as e:
-        st.error(f"Failed to load model: {str(e)}")
-        st.info("Make sure the model file exists at the specified path!")
+    except Exception:
         return None
 
 def initialize_session_state():
-    """Initialize session state variables"""
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    """Initialize all session state variables"""
+    defaults = {
+        "messages": [],
+        "memory": ConversationBufferMemory(return_messages=True),
+        "energy_level": 7,
+        "reference_frequency": 5,
+        "response_length": "Balanced",
+        "use_emojis": True,
+        "iyad_mood": "✨ Hype Beast",
+        "conversation_count": 0,
+        "is_typing": False,
+        "last_activity": datetime.now()
+    }
     
-    if "memory" not in st.session_state:
-        st.session_state.memory = ConversationBufferMemory(return_messages=True)
-    
+    for key, default_value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = default_value
+
+    # Initialize conversation chain
     if "chain" not in st.session_state:
         llm = load_llm()
-        if llm:
-            st.session_state.chain = ConversationChain(
-                llm=llm,
-                memory=st.session_state.memory,
-                verbose=False
-            )
-        else:
-            st.session_state.chain = None
+        st.session_state.chain = ConversationChain(
+            llm=llm,
+            memory=st.session_state.memory,
+            verbose=False
+        ) if llm else None
 
 def add_message(role: str, content: str):
-    """Add a message to the chat history"""
-    st.session_state.messages.append({"role": role, "content": content})
+    """Add a message to the conversation history"""
+    st.session_state.messages.append({
+        "role": role, 
+        "content": content,
+        "timestamp": datetime.now()
+    })
+    if role == "user":
+        st.session_state.conversation_count += 1
+    st.session_state.last_activity = datetime.now()
 
-def display_chat_history():
-    """Display the chat history with custom styling"""
-    for message in st.session_state.messages:
-        if message["role"] == "user":
-            with st.container():
+def display_typing_indicator():
+    """Display typing indicator"""
+    if st.session_state.get('is_typing', False):
+        st.markdown("""
+        <div class="typing-indicator">
+            <div class="message-avatar avatar-bot">🤖</div>
+            <span>IyadBot is typing</span>
+            <div class="typing-dots">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+def display_chat_messages():
+    """Display chat messages with modern design"""
+    # Chat container
+    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+    
+    # Chat header
+    status = "Online" if st.session_state.chain else "Offline"
+    status_color = "#10b981" if st.session_state.chain else "#ef4444"
+    
+    st.markdown(f"""
+    <div class="chat-header">
+        <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 1.1rem;">🤖 IyadBot</div>
+            <div class="chat-status">
+                <div class="status-dot" style="background: {status_color};"></div>
+                {status} • Ready to chat
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Messages container
+    st.markdown('<div class="chat-messages">', unsafe_allow_html=True)
+    
+    if not st.session_state.messages:
+        # Welcome message
+        welcome_messages = [
+            "Hey Iyad! 👋 Ready to chat about Genshin, idols, or anything else?",
+            "Yooo bestie! Let's talk about your latest Genshin pulls or favorite idol songs 🎵",
+            "Wassup Iyad! Noah and Milo say hi 🐾 What's on your mind today?",
+            "Hey there! Your digital bestie is here and ready to vibe 🌟",
+            "What's good, Iyad? Ready to dive into some epic conversations? ✨"
+        ]
+        
+        welcome_msg = random.choice(welcome_messages)
+        st.markdown(f"""
+        <div class="message message-bot">
+            <div class="message-avatar avatar-bot">🤖</div>
+            <div class="message-bubble message-bubble-bot">
+                {welcome_msg}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        # Display conversation history
+        for msg in st.session_state.messages:
+            if msg["role"] == "user":
                 st.markdown(f"""
-                <div class="chat-message user-message">
-                    <strong>You:</strong> {message["content"]}
+                <div class="message message-user">
+                    <div class="message-bubble message-bubble-user">
+                        {msg["content"]}
+                    </div>
+                    <div class="message-avatar avatar-user">😊</div>
                 </div>
                 """, unsafe_allow_html=True)
-        else:
-            with st.container():
+            else:
                 st.markdown(f"""
-                <div class="chat-message bot-message">
-                    <strong>IyadBot:</strong> {message["content"]}
+                <div class="message message-bot">
+                    <div class="message-avatar avatar-bot">🤖</div>
+                    <div class="message-bubble message-bubble-bot">
+                        {msg["content"]}
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
+    
+    # Typing indicator
+    display_typing_indicator()
+    
+    st.markdown('</div>', unsafe_allow_html=True)  # Close messages
+    st.markdown('</div>', unsafe_allow_html=True)  # Close container
 
 def get_bot_response(user_input: str) -> Optional[str]:
-    """Get response from IyadBot with dynamic personality"""
+    """Generate bot response using the LLM"""
     if not st.session_state.chain:
-        return "Sorry, I'm having trouble loading right now! 😅 Check if the model file is in the right place."
+        return "I'm having trouble connecting to my brain right now 😅 Please check if the model is loaded correctly!"
     
     try:
-        # Get dynamic personality based on current settings
+        # Show typing indicator
+        st.session_state.is_typing = True
+        
+        # Create enhanced prompt with personality
         personality_prompt = get_dynamic_personality()
         
-        # Create the full prompt with dynamic personality
-        full_prompt = f"{personality_prompt}\n\nHuman: {user_input}\n\nAssistant:"
+        response = st.session_state.chain.predict(
+            input=f"{personality_prompt}\n\nUser: {user_input}\nIyadBot:"
+        )
         
-        # Get response from the chain
-        with st.spinner("IyadBot is thinking... 🤔"):
-            response = st.session_state.chain.predict(input=user_input)
+        # Hide typing indicator
+        st.session_state.is_typing = False
         
         return response.strip()
-    
+        
     except Exception as e:
-        return f"Oops! Something went wrong: {str(e)} 😓"
+        st.session_state.is_typing = False
+        error_messages = [
+            f"Oops! Something went wrong: {str(e)} 😓",
+            "My brain had a little glitch there! Can you try again? 🤖💭",
+            "Error alert! But I'm still here for you! 💪"
+        ]
+        return random.choice(error_messages)
+
+def create_sidebar():
+    """Create enhanced sidebar"""
+    with st.sidebar:
+        # Personality Settings
+        st.markdown("""
+        <div class="sidebar-content">
+            <div class="sidebar-header">
+                🎛️ Personality Settings
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Energy level
+        st.session_state.energy_level = st.slider(
+            "⚡ Energy Level", 
+            min_value=1, max_value=10, 
+            value=st.session_state.get('energy_level', 7),
+            help="How energetic should IyadBot be?"
+        )
+        
+        # Reference frequency
+        st.session_state.reference_frequency = st.slider(
+            "🎯 Interest References", 
+            min_value=1, max_value=10, 
+            value=st.session_state.get('reference_frequency', 5),
+            help="How often to mention your interests?"
+        )
+        
+        # Response length
+        st.session_state.response_length = st.selectbox(
+            "📝 Response Length",
+            options=["Short & Sweet", "Balanced", "Detailed"],
+            index=["Short & Sweet", "Balanced", "Detailed"].index(
+                st.session_state.get('response_length', 'Balanced')
+            )
+        )
+        
+        # Emoji usage
+        st.session_state.use_emojis = st.checkbox(
+            "✨ Use Emojis", 
+            value=st.session_state.get('use_emojis', True)
+        )
+        
+        # Current mood
+        mood_options = [
+            "✨ Hype Beast", "🌟 Supportive Friend", "🎵 Music Vibes", 
+            "🎮 Gaming Mode", "🐾 Pet Parent", "💭 Deep Thinker",
+            "🏔️ Genshin Explorer", "🎊 Celebration Mode"
+        ]
+        
+        st.session_state.iyad_mood = st.selectbox(
+            "🎭 Current Mood",
+            options=mood_options,
+            index=mood_options.index(st.session_state.get('iyad_mood', '✨ Hype Beast'))
+        )
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Quick Actions
+        st.markdown("""
+        <div class="sidebar-content">
+            <div class="sidebar-header">
+                ⚡ Quick Actions
+            </div>
+            <div class="quick-actions">
+        """, unsafe_allow_html=True)
+        
+        quick_actions = [
+            "🎮 Latest Genshin pulls?",
+            "🎵 Recommend idol songs",
+            "🐾 How are Noah & Milo?",
+            "✨ Hype me up!",
+            "💭 Deep conversation"
+        ]
+        
+        for action in quick_actions:
+            if st.button(action, key=f"quick_{action}", use_container_width=True):
+                add_message("user", action)
+                response = get_bot_response(action)
+                if response:
+                    add_message("assistant", response)
+                st.rerun()
+        
+        st.markdown('</div></div>', unsafe_allow_html=True)
+        
+        # Statistics
+        st.markdown(f"""
+        <div class="sidebar-content">
+            <div class="sidebar-header">
+                📊 Chat Stats
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">{st.session_state.conversation_count}</div>
+                    <div class="stat-label">Conversations</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{len(st.session_state.messages)}</div>
+                    <div class="stat-label">Messages</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Clear chat
+        if st.button("🗑️ Clear Chat", use_container_width=True, type="secondary"):
+            st.session_state.messages = []
+            st.session_state.memory.clear()
+            st.session_state.conversation_count = 0
+            st.rerun()
 
 def main():
     """Main application function"""
-    # Initialize session state
     initialize_session_state()
     
     # Header
     st.markdown("""
     <div class="main-header">
-        <h1>🌟 IyadBot - Your Smart AI Bestie</h1>
-        <p>Ready to chat about Genshin, idols, and everything in between! ✨</p>
+        <h1>IyadBot</h1>
+        <p>Your Smart AI Bestie - Ready to chat about Genshin, idols, pets and everything in between!</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Sidebar with multiple tabs
-    with st.sidebar:
-        tab1, tab2, tab3, tab4 = st.tabs(["🏠 Home", "👤 About Iyad", "🎮 Interests", "⚙️ Settings"])
-        
-        with tab1:
-            st.header("🌟 IyadBot")
-            st.write("Your personalized AI bestie!")
-            
-            # Model status
-            if st.session_state.chain:
-                st.success("🤖 Model loaded successfully!")
-            else:
-                st.error("❌ Model not loaded")
-                st.info("Check your model path in the code!")
-            
-            # Chat stats
-            if st.session_state.messages:
-                st.metric("💬 Messages", len(st.session_state.messages))
-                st.metric("🧠 Memory Size", len(st.session_state.memory.buffer))
-        
-        with tab2:
-            st.header("👤 About Iyad")
-            st.markdown("""
-            **Meet Iyad!** 🌟
-            
-            **Personality:**
-            • Chill and smart 🧠
-            • Loves deep conversations 💭
-            • Always up for gaming talk 🎮
-            • Supportive bestie energy ✨
-            
-            **Fun Facts:**
-            • Genshin Impact enthusiast 🗡️
-            • Idol music lover 🎵
-            • Has great friends Noah & Milo 👥
-            • Always positive vibes 😊
-            
-            **Favorite Things:**
-            • Late night gaming sessions 🌙
-            • Discovering new music 🎧
-            • Chatting about life 💫
-            • Hyping up friends 📢
-            """)
-            
-            # Iyad's mood indicator
-            st.markdown("**Current Vibe:**")
-            moods = ["🎮 Gaming Mode", "🎵 Jamming Out", "💭 Deep Thoughts", "✨ Hype Beast", "😌 Chill Vibes"]
-            current_mood = st.selectbox("Iyad's Mood", moods, key="iyad_mood")
-            
-        with tab3:
-            st.header("🎮 Iyad's Interests")
-            
-            # Genshin Impact section
-            with st.expander("🗡️ Genshin Impact"):
-                st.write("**Favorite Characters:**")
-                genshin_chars = ["Zhongli", "Venti", "Raiden Shogun", "Kazuha", "Albedo"]
-                selected_chars = st.multiselect("Characters Iyad loves:", genshin_chars, default=["Zhongli", "Kazuha"])
-                
-                st.write("**Favorite Regions:**")
-                regions = ["Mondstadt", "Liyue", "Inazuma", "Sumeru", "Fontaine"]
-                fav_region = st.radio("Best region:", regions, index=1)
-            
-            # Music & Idols section
-            with st.expander("🎵 Music & Idols"):
-                st.write("**Favorite Genres:**")
-                genres = ["K-Pop", "J-Pop", "Electronic", "Indie", "Pop Rock"]
-                selected_genres = st.multiselect("Music genres:", genres, default=["K-Pop", "Electronic"])
-                
-                st.write("**Favorite Groups/Artists:**")
-                artists_input = st.text_area("Add Iyad's favorite artists:", 
-                                           placeholder="BTS, TWICE, NewJeans, etc.", height=100)
-            
-            # Friends section
-            with st.expander("👥 Friends - Noah & Milo"):
-                col_noah, col_milo = st.columns(2)
-                with col_noah:
-                    st.write("**Noah** 👤")
-                    st.write("• Great friend")
-                    st.write("• Fun to hang out with")
-                    st.write("• Gaming buddy")
-                
-                with col_milo:
-                    st.write("**Milo** 👤")
-                    st.write("• Close friend")
-                    st.write("• Good company")
-                    st.write("• Always supportive")
-        
-        with tab4:
-            st.header("⚙️ Settings")
-            
-            # Bot personality settings
-            st.subheader("🤖 Bot Personality")
-            energy_level = st.slider("Energy Level", 1, 10, 7, help="How hyped should IyadBot be?")
-            reference_frequency = st.slider("Reference Frequency", 1, 10, 5, help="How often to mention Genshin/Idols/Pets")
-            
-            # Chat preferences
-            st.subheader("💬 Chat Preferences")
-            response_length = st.selectbox("Response Length", ["Short & Sweet", "Balanced", "Detailed"], index=1)
-            use_emojis = st.checkbox("Use Emojis", value=True)
-            
-            # Quick actions
-            st.subheader("🔧 Quick Actions")
-            col_clear, col_export = st.columns(2)
-            
-            with col_clear:
-                if st.button("🗑️ Clear Chat", use_container_width=True):
-                    st.session_state.messages = []
-                    st.session_state.memory.clear()
-                    st.success("Chat cleared!")
-                    st.rerun()
-            
-            with col_export:
-                if st.button("📤 Export Chat", use_container_width=True):
-                    if st.session_state.messages:
-                        chat_export = "\n\n".join([f"{msg['role'].title()}: {msg['content']}" for msg in st.session_state.messages])
-                        st.download_button(
-                            "Download Chat",
-                            chat_export,
-                            file_name="iyad_bot_chat.txt",
-                            mime="text/plain"
-                        )
-                    else:
-                        st.warning("No chat to export!")
-            
-            # Store settings in session state
-            st.session_state.energy_level = energy_level
-            st.session_state.reference_frequency = reference_frequency
-            st.session_state.response_length = response_length
-            st.session_state.use_emojis = use_emojis
+    # Create sidebar
+    create_sidebar()
     
-    # Main chat interface with quick suggestions
-    st.subheader("💬 Chat with IyadBot")
-    
-    # Quick suggestion buttons
-    st.markdown("**Quick Chat Ideas:**")
-    col1, col2, col3, col4 = st.columns(4)
-    
-    quick_prompts = [
-        "How's your day going? 🌟",
-        "Tell me about Genshin! 🗡️", 
-        "What music are you into? 🎵",
-        "How are Noah & Milo? 👥"
-    ]
-    
-    for i, (col, prompt) in enumerate(zip([col1, col2, col3, col4], quick_prompts)):
-        with col:
-            if st.button(prompt, key=f"quick_{i}", use_container_width=True):
-                # Add the quick prompt as user input
-                add_message("user", prompt)
-                bot_response = get_bot_response(prompt)
-                if bot_response:
-                    add_message("assistant", bot_response)
-                st.rerun()
-    
-    st.markdown("---")
-    
-    # Main input area
-    col1, col2 = st.columns([4, 1])
+    # Main chat area
+    col1, col2 = st.columns([3, 1])
     
     with col1:
-        user_input = st.text_input(
-            "💬 Message IyadBot:",
-            placeholder="What's up? Ask me anything! 🌟",
-            key="user_input"
-        )
-    
-    with col2:
-        send_button = st.button("Send", use_container_width=True, type="primary")
-    
-    # Handle user input
-    if (user_input and send_button) or (user_input and st.session_state.get("enter_pressed", False)):
-        if user_input.strip():
+        # Display chat
+        display_chat_messages()
+        
+        # Input area
+        st.markdown('<div class="input-container">', unsafe_allow_html=True)
+        
+        # Create input with better UX
+        input_col1, input_col2 = st.columns([5, 1])
+        
+        with input_col1:
+            user_input = st.text_input(
+                "",
+                key="user_input",
+                placeholder="Type your message here... Ask about Genshin, idols, or just say hi! 💬",
+                label_visibility="collapsed"
+            )
+        
+        with input_col2:
+            send_button = st.button("Send", use_container_width=True, type="primary")
+        
+        # Handle Enter key and send button
+        if (send_button or user_input) and user_input and user_input.strip():
             # Add user message
             add_message("user", user_input)
             
-            # Get bot response
-            bot_response = get_bot_response(user_input)
-            if bot_response:
-                add_message("assistant", bot_response)
+            # Clear input immediately for better UX
+            st.session_state.user_input = ""
             
-            # Clear input and rerun
-            st.session_state["user_input"] = ""
+            # Get bot response
+            with st.spinner("🤖 IyadBot is thinking..."):
+                response = get_bot_response(user_input)
+                if response:
+                    add_message("assistant", response)
+            
             st.rerun()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Model status
+        if not st.session_state.chain:
+            st.error("⚠️ Model not loaded! Please check the model file path.")
+            st.info("💡 Expected path: `models/mistral-7b-instruct-v0.1.Q4_K_M.gguf`")
     
-    # Display chat history
-    if st.session_state.messages:
-        st.markdown("---")
-        display_chat_history()
-    else:
-        # Welcome message with personalization
-        welcome_messages = [
-            "Hey Iyad! 👋 Ready for another awesome chat? What's been on your mind lately? ✨",
-            "What's up, bestie! 🌟 Wanna talk about your latest Genshin pulls or jam to some music? 🎮🎵",
-            "Yooo Iyad! Hope Noah and Milo are doing great! 👥 What adventure are we going on today? 💫",
-            "Hey there! 😊 Your AI bestie is here and ready to vibe! Gaming, music, or just life stuff? 🎯"
-        ]
-        
-        import random
-        welcome_msg = random.choice(welcome_messages)
-        
-        st.markdown(f"""
-        <div class="chat-message bot-message">
-            <strong>IyadBot:</strong> {welcome_msg}
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Fun facts about Iyad
-        with st.expander("🎯 Fun conversation starters"):
-            st.markdown("""
-            **Try asking about:**
-            - "What's your favorite Genshin character and why?"
-            - "Recommend me some K-Pop songs!"
-            - "How are Noah and Milo doing today?"
-            - "What's the best region in Genshin?"
-            - "I'm feeling down, hype me up!"
-            - "Tell me about your latest gaming session"
-            """)
-    
-    # JavaScript for Enter key support
-    st.markdown("""
-    <script>
-    const input = window.parent.document.querySelector('[data-testid="textInput-user_input"]');
-    if (input) {
-        input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const sendButton = window.parent.document.querySelector('button[kind="primary"]');
-                if (sendButton) sendButton.click();
-            }
-        });
-    }
-    </script>
-    """, unsafe_allow_html=True)
+    with col2:
+        # Additional info or features could go here
+        pass
 
 if __name__ == "__main__":
     main()
